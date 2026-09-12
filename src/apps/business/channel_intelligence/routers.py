@@ -1,0 +1,70 @@
+from fastapi import APIRouter, Query
+
+from src.apps.business.channel_intelligence.schemas import (
+    AccountSummaryRead,
+    ChannelDashboardRead,
+    ChannelSummaryRead,
+    ContentSignalRead,
+    FilterOptionsRead,
+    ShopSummaryRead,
+    VideoListRead,
+)
+from src.apps.business.channel_intelligence.services import (
+    get_account_summaries,
+    get_channel_dashboard,
+    get_channel_summary,
+    get_content_signals,
+    get_filter_options,
+    get_shop_summaries,
+    get_video_list,
+)
+
+router = APIRouter(
+    prefix="/channel-intelligence",
+    tags=["Business - Channel Intelligence"],
+)
+
+
+@router.get("/dashboard", response_model=ChannelDashboardRead)
+async def read_channel_dashboard():
+    return await get_channel_dashboard()
+
+
+@router.get("/summary", response_model=ChannelSummaryRead)
+async def read_channel_summary():
+    return await get_channel_summary()
+
+
+@router.get("/shops", response_model=list[ShopSummaryRead])
+async def read_shop_summaries():
+    return await get_shop_summaries()
+
+
+@router.get("/accounts", response_model=list[AccountSummaryRead])
+async def read_account_summaries():
+    return await get_account_summaries()
+
+
+@router.get("/videos", response_model=VideoListRead)
+async def read_video_list(
+        shop: str | None = None,
+        account: str | None = None,
+        page: int = Query(default=1, ge=1),
+        page_size: int = Query(default=20, ge=1, le=100),
+):
+    return await get_video_list(
+        shop=shop,
+        account=account,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("/signals", response_model=ContentSignalRead)
+async def read_content_signals():
+    return await get_content_signals()
+
+
+@router.get("/filters", response_model=FilterOptionsRead)
+async def read_filter_options():
+    return await get_filter_options()

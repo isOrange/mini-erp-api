@@ -6,6 +6,7 @@ from src.apps.business.channel_intelligence.schemas import (
     ChannelSourceCreate,
     ChannelSourceRead,
     ChannelSummaryRead,
+    CollectionRunRead,
     ContentSignalRead,
     FilterOptionsRead,
     ShopSummaryRead,
@@ -13,10 +14,12 @@ from src.apps.business.channel_intelligence.schemas import (
 )
 from src.apps.business.channel_intelligence.services import (
     create_channel_source,
+    create_collection_run,
     get_account_summaries,
     get_channel_dashboard,
     get_channel_sources,
     get_channel_summary,
+    get_collection_runs,
     get_content_signals,
     get_filter_options,
     get_shop_summaries,
@@ -82,3 +85,23 @@ async def write_channel_source(source: ChannelSourceCreate):
 @router.get("/sources", response_model=list[ChannelSourceRead])
 async def read_channel_sources():
     return await get_channel_sources()
+
+
+@router.post("/collection-runs", response_model=CollectionRunRead)
+async def write_collection_run(
+        source_id: int,
+        status: str,
+        collected_count: int,
+        error_message: str | None = None,
+):
+    return await create_collection_run(
+        source_id=source_id,
+        status=status,
+        collected_count=collected_count,
+        error_message=error_message,
+    )
+
+
+@router.get("/collection-runs", response_model=list[CollectionRunRead])
+async def read_collection_runs():
+    return await get_collection_runs()

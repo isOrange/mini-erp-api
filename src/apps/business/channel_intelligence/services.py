@@ -237,13 +237,13 @@ async def create_channel_source(source: ChannelSourceCreate) -> ChannelSourceRea
         if existing_source.account == source.account:
             raise HTTPException(
                 status_code=400,
-                detail="Channel source account already exists"
+                detail="Channel source account already exists",
             )
 
         if existing_source.source_url == source.source_url:
             raise HTTPException(
                 status_code=400,
-                detail="Channel source URL already exists"
+                detail="Channel source URL already exists",
             )
 
     new_source = ChannelSourceRead(
@@ -269,3 +269,47 @@ async def get_channel_sources() -> list[ChannelSourceRead]:
         当前系统中的数据源配置列表。
     """
     return channel_sources_db
+
+
+async def create_collection_run(
+        source_id: int,
+        status: str,
+        collected_count: int,
+        error_message: str | None = None,
+) -> CollectionRunRead:
+    """
+    创建一次采集任务执行记录。
+
+    Args:
+        source_id: 被采集的数据源 id。
+        status: 采集状态，例如 success 或 failed。
+        collected_count: 本次采集到的视频数量。
+        error_message: 采集失败时的错误信息。
+
+    Returns:
+        创建后的采集任务执行记录。
+    """
+    global next_run_id
+
+    new_run = CollectionRunRead(
+        id=next_run_id,
+        source_id=source_id,
+        status=status,
+        collected_count=collected_count,
+        error_message=error_message,
+    )
+
+    collection_runs_db.append(new_run)
+    next_run_id += 1
+
+    return new_run
+
+
+async def get_collection_runs() -> list[CollectionRunRead]:
+    """
+    查询所有采集任务执行记录。
+
+    Returns:
+        当前系统中的采集任务执行记录列表。
+    """
+    return collection_runs_db

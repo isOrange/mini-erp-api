@@ -39,6 +39,7 @@ class VideoRead(BaseModel):
     account: str
     video_title: str
     video_url: str
+    thumbnail_url: str | None = None
     published_at: str
     duration_seconds: int
     views: int

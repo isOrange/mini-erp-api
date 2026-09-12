@@ -13,7 +13,7 @@ from src.apps.business.channel_intelligence.schemas import (
     VideoRead,
 )
 
-CSV_PATH = Path("C:/Users/Admnistrator/Downloads/tiktok-dashboard-2026-09-12.csv")
+CSV_PATH = Path("data/tiktok-dashboard.csv")
 
 CSV_COLUMNS = [
     "shop",

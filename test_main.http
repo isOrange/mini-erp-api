@@ -1,0 +1,46 @@
+# Test your FastAPI endpoints
+
+### 根路径
+GET http://127.0.0.1:8000/
+
+### 健康检查
+GET http://127.0.0.1:8000/health
+
+
+### 查询用户列表
+GET http://127.0.0.1:8000/users
+
+### 查询单个用户
+GET http://127.0.0.1:8000/users/1
+
+### 查询不存在的用户
+GET http://127.0.0.1:8000/users/999
+
+### 创建用户
+POST http://127.0.0.1:8000/users
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "123456",
+  "email": "admin@example.com"
+}
+
+
+### 登录成功
+POST http://127.0.0.1:8000/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "123456"
+}
+
+### 登录失败
+POST http://127.0.0.1:8000/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "wrong-password"
+}

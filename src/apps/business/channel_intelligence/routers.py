@@ -24,6 +24,7 @@ from src.apps.business.channel_intelligence.services import (
     get_filter_options,
     get_shop_summaries,
     get_video_list,
+    collect_channel_source,
 )
 
 router = APIRouter(
@@ -105,3 +106,8 @@ async def write_collection_run(
 @router.get("/collection-runs", response_model=list[CollectionRunRead])
 async def read_collection_runs():
     return await get_collection_runs()
+
+
+@router.post("/sources/{source_id}/collect", response_model=CollectionRunRead)
+async def write_channel_source_collection(source_id: int):
+    return await collect_channel_source(source_id)

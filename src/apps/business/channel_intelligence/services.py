@@ -4,6 +4,7 @@ from statistics import median
 
 from fastapi import HTTPException
 
+from src.apps.business.channel_intelligence.collectors import collect_tiktok_account_videos
 from src.apps.business.channel_intelligence.schemas import (
     AccountSummaryRead,
     ChannelDashboardRead,
@@ -269,6 +270,57 @@ async def get_channel_sources() -> list[ChannelSourceRead]:
         当前系统中的数据源配置列表。
     """
     return channel_sources_db
+
+
+async def collect_channel_source(source_id: int) -> CollectionRunRead:
+    """
+    触发指定 TikTok 渠道账号数据源的采集任务。
+
+    Args:
+        source_id: 要采集的数据源 id。
+
+    Returns:
+        本次采集任务执行记录。
+    """
+    source = next(
+        (
+            channel_source
+            for channel_source in channel_sources_db
+            if channel_source.id == source_id
+        ),
+        None,
+    )
+
+    if source is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Channel source not found",
+        )
+
+    if not source.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="Channel source is inactive",
+        )
+
+    try:
+        videos = collect_tiktok_account_videos(
+            account=source.account,
+            shop=source.shop,
+        )
+
+        return await create_collection_run(
+            source_id=source.id,
+            status="success",
+            collected_count=len(videos),
+        )
+    except Exception as error:
+        return await create_collection_run(
+            source_id=source.id,
+            status="failed",
+            collected_count=0,
+            error_message=str(error),
+        )
 
 
 async def create_collection_run(

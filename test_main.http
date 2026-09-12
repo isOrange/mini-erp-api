@@ -44,3 +44,7 @@ Content-Type: application/json
   "username": "admin",
   "password": "wrong-password"
 }
+
+### 当前用户
+GET http://127.0.0.1:8000/auth/me
+Authorization: Bearer fake-token-for-admin

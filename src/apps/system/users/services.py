@@ -3,9 +3,16 @@
 from src.apps.system.users.schemas import UserRead, UserCreate, UserInDB
 
 # 临时假数据库，程序重启后会清空
-users_db: list[UserInDB] = []
+users_db: list[UserInDB] = [
+    UserInDB(
+        id=1,
+        username="admin",
+        email="admin@example.com",
+        hashed_password="hashed_123456",
+    )
+]
 # 模拟数据库自增 ID
-next_user_id: int = 1
+next_user_id: int = 2
 
 
 def fake_hashed_password(password: str) -> str:
@@ -47,6 +54,7 @@ async def get_user(user_id: int) -> UserRead | None:
 
     return None
 
+
 async def get_user_in_db_by_username(username: str) -> UserInDB | None:
     """根据 username 查询内部用户数据，供登录认证使用。"""
 
@@ -56,7 +64,7 @@ async def get_user_in_db_by_username(username: str) -> UserInDB | None:
 
     return None
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """校验明文密码和内部保存的哈希密码是否匹配。"""
     return fake_hashed_password(plain_password) == hashed_password
-

@@ -8,32 +8,24 @@ from src.apps.system.users.services import (
     get_user_in_db_by_username,
     verify_password
 )
-
-# 学习阶段先写死密钥；真实项目要放到 .env，不能提交到 GitHub。
-# SECRET_KEY：服务器用来签名和验签的密钥
-# ALGORITHM：签名算法
-# ACCESS_TOKEN_EXPIRE_MINUTES：access token 有效期
-SECRET_KEY = "dev-secret-key-change-me-please-32-bytes"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
+from src.core.config import settings
 
 def create_access_token(username: str) -> str:
     """创建 access token。"""
 
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
 
     payload = {
         "sub": username,
         "exp": expire,
     }
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
 def parse_access_token(token: str) -> str | None:
     """解析 access token，成功时返回 username。"""
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
     except jwt.PyJWTError:
         return None
 

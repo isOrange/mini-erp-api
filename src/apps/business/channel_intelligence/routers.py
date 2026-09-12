@@ -3,6 +3,8 @@ from fastapi import APIRouter, Query
 from src.apps.business.channel_intelligence.schemas import (
     AccountSummaryRead,
     ChannelDashboardRead,
+    ChannelSourceCreate,
+    ChannelSourceRead,
     ChannelSummaryRead,
     ContentSignalRead,
     FilterOptionsRead,
@@ -10,8 +12,10 @@ from src.apps.business.channel_intelligence.schemas import (
     VideoListRead,
 )
 from src.apps.business.channel_intelligence.services import (
+    create_channel_source,
     get_account_summaries,
     get_channel_dashboard,
+    get_channel_sources,
     get_channel_summary,
     get_content_signals,
     get_filter_options,
@@ -68,3 +72,13 @@ async def read_content_signals():
 @router.get("/filters", response_model=FilterOptionsRead)
 async def read_filter_options():
     return await get_filter_options()
+
+
+@router.post("/sources", response_model=ChannelSourceRead)
+async def write_channel_source(source: ChannelSourceCreate):
+    return await create_channel_source(source)
+
+
+@router.get("/sources", response_model=list[ChannelSourceRead])
+async def read_channel_sources():
+    return await get_channel_sources()

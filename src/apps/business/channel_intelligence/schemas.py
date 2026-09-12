@@ -79,3 +79,33 @@ class ChannelDashboardRead(BaseModel):
     shops: list[ShopSummaryRead]
     accounts: list[AccountSummaryRead]
     signals: ContentSignalRead
+
+
+class ChannelSourceRead(BaseModel):
+    """渠道账号数据源返回模型。"""
+
+    id: int
+    shop: str
+    account: str
+    source_url: str
+    is_active: bool
+    last_collected_at: str | None = None
+
+
+class ChannelSourceCreate(BaseModel):
+    """渠道账号数据源创建入参。"""
+
+    shop: str
+    account: str
+    source_url: str
+    is_active: bool = True
+
+
+class CollectionRunRead(BaseModel):
+    """采集任务执行记录。"""
+
+    id: int
+    source_id: int
+    status: str
+    collected_count: int
+    error_message: str | None = None

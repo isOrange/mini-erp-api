@@ -2,10 +2,15 @@ import csv
 from pathlib import Path
 from statistics import median
 
+from fastapi import HTTPException
+
 from src.apps.business.channel_intelligence.schemas import (
     AccountSummaryRead,
     ChannelDashboardRead,
+    ChannelSourceCreate,
+    ChannelSourceRead,
     ChannelSummaryRead,
+    CollectionRunRead,
     ContentSignalRead,
     FilterOptionsRead,
     ShopSummaryRead,
@@ -29,6 +34,16 @@ CSV_COLUMNS = [
     "saves",
     "engagement_rate",
 ]
+
+# 临时内存数据源配置。后续接入数据库后，这里会替换成 sources 表。
+channel_sources_db: list[ChannelSourceRead] = []
+
+# 临时内存采集记录。后续接入数据库后，这里会替换成 collection_runs 表。
+collection_runs_db: list[CollectionRunRead] = []
+
+next_source_id: int = 1
+
+next_run_id: int = 1
 
 
 def to_int(value: str) -> int:
@@ -204,3 +219,53 @@ async def get_channel_dashboard() -> ChannelDashboardRead:
         accounts=await get_account_summaries(),
         signals=await get_content_signals(),
     )
+
+
+async def create_channel_source(source: ChannelSourceCreate) -> ChannelSourceRead:
+    """
+    创建 TikTok 渠道账号数据源配置。
+
+    Args:
+        source: 客户端提交的数据源配置，包括店铺、账号、主页 URL 和启用状态。
+
+    Returns:
+        创建后的数据源配置，包含系统分配的 id。
+    """
+    global next_source_id
+
+    for existing_source in channel_sources_db:
+        if existing_source.account == source.account:
+            raise HTTPException(
+                status_code=400,
+                detail="Channel source account already exists"
+            )
+
+        if existing_source.source_url == source.source_url:
+            raise HTTPException(
+                status_code=400,
+                detail="Channel source URL already exists"
+            )
+
+    new_source = ChannelSourceRead(
+        id=next_source_id,
+        shop=source.shop,
+        account=source.account,
+        source_url=source.source_url,
+        is_active=source.is_active,
+        last_collected_at=None,
+    )
+
+    channel_sources_db.append(new_source)
+    next_source_id += 1
+
+    return new_source
+
+
+async def get_channel_sources() -> list[ChannelSourceRead]:
+    """
+    查询所有 TikTok 渠道账号数据源配置。
+
+    Returns:
+        当前系统中的数据源配置列表。
+    """
+    return channel_sources_db

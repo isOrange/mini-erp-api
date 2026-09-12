@@ -1,12 +1,19 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.apps.system.health.services import get_health_status
+from src.apps.system.health.services import get_health_status, get_ready_status
+from src.core.database import get_db_session
 
-# APIRouter 是一个“子路由容器”，用于把某个模块的接口集中管理。
-# main.py 会通过 app.include_router(...) 把它注册到主应用。
 router = APIRouter(tags=["System Health"])
+
 
 @router.get("/health")
 async def health():
-    # router 层只负责接收 HTTP 请求，真正逻辑交给 service 层。
+    """检查应用进程是否存活。"""
     return await get_health_status()
+
+
+@router.get("/ready")
+async def ready(db: AsyncSession = Depends(get_db_session)):
+    """检查应用依赖是否可用。"""
+    return await get_ready_status(db)

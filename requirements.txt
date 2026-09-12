@@ -1,0 +1,8 @@
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic-settings==2.15.0
+PyJWT==2.14.0
+SQLAlchemy==2.0.52
+asyncmy==0.2.14
+alembic==1.20.0
+yt-dlp==2026.8.19

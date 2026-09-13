@@ -6,8 +6,11 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.business.channel_intelligence.collectors import collect_tiktok_account_videos
-from src.apps.business.channel_intelligence.models import ChannelSource
-from src.apps.business.channel_intelligence.repositories import ChannelSourceRepository
+from src.apps.business.channel_intelligence.models import ChannelSource, CollectionRun
+from src.apps.business.channel_intelligence.repositories import (
+    ChannelSourceRepository,
+    CollectionRunRepository,
+)
 from src.apps.business.channel_intelligence.schemas import (
     AccountSummaryRead,
     ChannelDashboardRead,
@@ -304,7 +307,10 @@ async def get_channel_sources(db: AsyncSession) -> list[ChannelSourceRead]:
     ]
 
 
-async def collect_channel_source(source_id: int) -> CollectionRunRead:
+async def collect_channel_source(
+        source_id: int,
+        db: AsyncSession,
+) -> CollectionRunRead:
     """
     触发指定 TikTok 渠道账号数据源的采集任务。
 
@@ -345,12 +351,14 @@ async def collect_channel_source(source_id: int) -> CollectionRunRead:
             source_id=source.id,
             status="success",
             collected_count=len(videos),
+            db=db,
         )
     except Exception as error:
         return await create_collection_run(
             source_id=source.id,
             status="failed",
             collected_count=0,
+            db=db,
             error_message=str(error),
         )
 
@@ -359,6 +367,7 @@ async def create_collection_run(
         source_id: int,
         status: str,
         collected_count: int,
+        db: AsyncSession,
         error_message: str | None = None,
 ) -> CollectionRunRead:
     """
@@ -368,32 +377,52 @@ async def create_collection_run(
         source_id: 被采集的数据源 id。
         status: 采集状态，例如 success 或 failed。
         collected_count: 本次采集到的视频数量。
+        db: 当前请求使用的数据库会话。
         error_message: 采集失败时的错误信息。
 
     Returns:
         创建后的采集任务执行记录。
     """
-    global next_run_id
+    repository = CollectionRunRepository(db)
 
-    new_run = CollectionRunRead(
-        id=next_run_id,
+    new_run = CollectionRun(
         source_id=source_id,
         status=status,
         collected_count=collected_count,
         error_message=error_message,
     )
 
-    collection_runs_db.append(new_run)
-    next_run_id += 1
+    created_run = await repository.create(new_run)
 
-    return new_run
+    return CollectionRunRead(
+        id=created_run.id,
+        source_id=created_run.source_id,
+        status=created_run.status,
+        collected_count=created_run.collected_count,
+        error_message=created_run.error_message,
+    )
 
 
-async def get_collection_runs() -> list[CollectionRunRead]:
+async def get_collection_runs(db: AsyncSession) -> list[CollectionRunRead]:
     """
     查询所有采集任务执行记录。
+
+    Args:
+        db: 当前请求使用的数据库会话。
 
     Returns:
         当前系统中的采集任务执行记录列表。
     """
-    return collection_runs_db
+    repository = CollectionRunRepository(db)
+    runs = await repository.get_all()
+
+    return [
+        CollectionRunRead(
+            id=run.id,
+            source_id=run.source_id,
+            status=run.status,
+            collected_count=run.collected_count,
+            error_message=run.error_message,
+        )
+        for run in runs
+    ]

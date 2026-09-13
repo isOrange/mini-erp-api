@@ -101,20 +101,27 @@ async def write_collection_run(
         status: str,
         collected_count: int,
         error_message: str | None = None,
+        db: AsyncSession = Depends(get_db_session),
 ):
     return await create_collection_run(
         source_id=source_id,
         status=status,
         collected_count=collected_count,
+        db=db,
         error_message=error_message,
     )
 
 
 @router.get("/collection-runs", response_model=list[CollectionRunRead])
-async def read_collection_runs():
-    return await get_collection_runs()
+async def read_collection_runs(
+        db: AsyncSession = Depends(get_db_session),
+):
+    return await get_collection_runs(db)
 
 
 @router.post("/sources/{source_id}/collect", response_model=CollectionRunRead)
-async def write_channel_source_collection(source_id: int):
-    return await collect_channel_source(source_id)
+async def write_channel_source_collection(
+        source_id: int,
+        db: AsyncSession = Depends(get_db_session),
+):
+    return await collect_channel_source(source_id, db)

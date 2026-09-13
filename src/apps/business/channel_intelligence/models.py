@@ -24,3 +24,18 @@ class ChannelSource(Base):
         onupdate=datetime.now,
         nullable=False,
     )
+
+
+class CollectionRun(Base):
+    """TikTok 渠道采集任务执行记录表。"""
+
+    __tablename__ = "collection_runs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    source_id: Mapped[int] = mapped_column(nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    collected_count: Mapped[int] = mapped_column(default=0, nullable=False)
+    error_message: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)

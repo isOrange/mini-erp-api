@@ -3,8 +3,11 @@ from pathlib import Path
 from statistics import median
 
 from fastapi import HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.business.channel_intelligence.collectors import collect_tiktok_account_videos
+from src.apps.business.channel_intelligence.models import ChannelSource
+from src.apps.business.channel_intelligence.repositories import ChannelSourceRepository
 from src.apps.business.channel_intelligence.schemas import (
     AccountSummaryRead,
     ChannelDashboardRead,
@@ -222,54 +225,83 @@ async def get_channel_dashboard() -> ChannelDashboardRead:
     )
 
 
-async def create_channel_source(source: ChannelSourceCreate) -> ChannelSourceRead:
+async def create_channel_source(
+        source: ChannelSourceCreate,
+        db: AsyncSession,
+) -> ChannelSourceRead:
     """
     创建 TikTok 渠道账号数据源配置。
 
     Args:
         source: 客户端提交的数据源配置，包括店铺、账号、主页 URL 和启用状态。
+        db: 当前请求使用的数据库会话。
 
     Returns:
         创建后的数据源配置，包含系统分配的 id。
     """
-    global next_source_id
+    repository = ChannelSourceRepository(db)
 
-    for existing_source in channel_sources_db:
-        if existing_source.account == source.account:
-            raise HTTPException(
-                status_code=400,
-                detail="Channel source account already exists",
-            )
+    existing_source = await repository.get_by_account(source.account)
+    if existing_source is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Channel source account already exists",
+        )
 
-        if existing_source.source_url == source.source_url:
-            raise HTTPException(
-                status_code=400,
-                detail="Channel source URL already exists",
-            )
+    existing_source = await repository.get_by_source_url(source.source_url)
+    if existing_source is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Channel source URL already exists",
+        )
 
-    new_source = ChannelSourceRead(
-        id=next_source_id,
+    new_source = ChannelSource(
         shop=source.shop,
         account=source.account,
         source_url=source.source_url,
         is_active=source.is_active,
-        last_collected_at=None,
     )
 
-    channel_sources_db.append(new_source)
-    next_source_id += 1
+    created_source = await repository.create(new_source)
 
-    return new_source
+    return ChannelSourceRead(
+        id=created_source.id,
+        shop=created_source.shop,
+        account=created_source.account,
+        source_url=created_source.source_url,
+        is_active=created_source.is_active,
+        last_collected_at=created_source.last_collected_at.isoformat()
+        if created_source.last_collected_at is not None
+        else None,
+    )
 
 
-async def get_channel_sources() -> list[ChannelSourceRead]:
+async def get_channel_sources(db: AsyncSession) -> list[ChannelSourceRead]:
     """
     查询所有 TikTok 渠道账号数据源配置。
+
+    Args:
+        db: 当前请求使用的数据库会话。
 
     Returns:
         当前系统中的数据源配置列表。
     """
-    return channel_sources_db
+    repository = ChannelSourceRepository(db)
+    sources = await repository.get_all()
+
+    return [
+        ChannelSourceRead(
+            id=source.id,
+            shop=source.shop,
+            account=source.account,
+            source_url=source.source_url,
+            is_active=source.is_active,
+            last_collected_at=source.last_collected_at.isoformat()
+            if source.last_collected_at is not None
+            else None,
+        )
+        for source in sources
+    ]
 
 
 async def collect_channel_source(source_id: int) -> CollectionRunRead:

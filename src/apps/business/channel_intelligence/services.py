@@ -1,4 +1,5 @@
 import csv
+from datetime import datetime
 from pathlib import Path
 from statistics import median
 
@@ -6,9 +7,10 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.business.channel_intelligence.collectors import collect_tiktok_account_videos
-from src.apps.business.channel_intelligence.models import ChannelSource, CollectionRun
+from src.apps.business.channel_intelligence.models import ChannelSource, CollectionRun, ChannelVideo
 from src.apps.business.channel_intelligence.repositories import (
     ChannelSourceRepository,
+    ChannelVideoRepository,
     CollectionRunRepository,
 )
 from src.apps.business.channel_intelligence.schemas import (
@@ -307,6 +309,41 @@ async def get_channel_sources(db: AsyncSession) -> list[ChannelSourceRead]:
     ]
 
 
+def to_channel_video_model(
+        video: VideoRead,
+        source_id: int,
+) -> ChannelVideo:
+    """
+    将采集到的视频返回模型转换成数据库视频模型。
+
+    Args:
+        video: 采集器返回的视频数据。
+        source_id: 视频所属的数据源 id。
+
+    Returns:
+        可写入数据库的视频模型。
+    """
+    return ChannelVideo(
+        source_id=source_id,
+        shop=video.shop,
+        account=video.account,
+        video_title=video.video_title,
+        video_url=video.video_url,
+        thumbnail_url=video.thumbnail_url,
+        published_at=datetime.fromtimestamp(int(video.published_at))
+        if video.published_at
+        else None,
+        duration_seconds=video.duration_seconds,
+        views=video.views,
+        likes=video.likes,
+        comments=video.comments,
+        shares=video.shares,
+        saves=video.saves,
+        engagement_rate=video.engagement_rate,
+        last_collected_at=datetime.now(),
+    )
+
+
 async def collect_channel_source(
         source_id: int,
         db: AsyncSession,
@@ -340,6 +377,16 @@ async def collect_channel_source(
             account=source.account,
             shop=source.shop,
         )
+
+        video_repository = ChannelVideoRepository(db)
+
+        for video in videos:
+            await video_repository.upsert(
+                to_channel_video_model(
+                    video=video,
+                    source_id=source.id,
+                )
+            )
 
         return await create_collection_run(
             source_id=source.id,

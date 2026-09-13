@@ -320,14 +320,8 @@ async def collect_channel_source(
     Returns:
         本次采集任务执行记录。
     """
-    source = next(
-        (
-            channel_source
-            for channel_source in channel_sources_db
-            if channel_source.id == source_id
-        ),
-        None,
-    )
+    source_repository = ChannelSourceRepository(db)
+    source = await source_repository.get_by_id(source_id)
 
     if source is None:
         raise HTTPException(

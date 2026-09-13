@@ -9,7 +9,7 @@ from alembic import context
 
 from src.core.config import settings
 from src.core.database import Base
-from src.apps.business.channel_intelligence.models import ChannelSource, CollectionRun  # noqa: F401
+from src.apps.business.channel_intelligence.models import ChannelSource, ChannelVideo, CollectionRun  # noqa: F401
 
 config = context.config
 

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.business.channel_intelligence.schemas import (
     AccountSummaryRead,
@@ -26,6 +27,7 @@ from src.apps.business.channel_intelligence.services import (
     get_video_list,
     collect_channel_source,
 )
+from src.core.database import get_db_session
 
 router = APIRouter(
     prefix="/channel-intelligence",
@@ -79,13 +81,18 @@ async def read_filter_options():
 
 
 @router.post("/sources", response_model=ChannelSourceRead)
-async def write_channel_source(source: ChannelSourceCreate):
-    return await create_channel_source(source)
+async def write_channel_source(
+        source: ChannelSourceCreate,
+        db: AsyncSession = Depends(get_db_session),
+):
+    return await create_channel_source(source, db)
 
 
 @router.get("/sources", response_model=list[ChannelSourceRead])
-async def read_channel_sources():
-    return await get_channel_sources()
+async def read_channel_sources(
+        db: AsyncSession = Depends(get_db_session),
+):
+    return await get_channel_sources(db)
 
 
 @router.post("/collection-runs", response_model=CollectionRunRead)

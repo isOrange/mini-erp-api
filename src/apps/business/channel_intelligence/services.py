@@ -1,13 +1,15 @@
-import csv
 from datetime import datetime
-from pathlib import Path
 from statistics import median
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.business.channel_intelligence.collectors import collect_tiktok_account_videos
-from src.apps.business.channel_intelligence.models import ChannelSource, CollectionRun, ChannelVideo
+from src.apps.business.channel_intelligence.models import (
+    ChannelSource,
+    ChannelVideo,
+    CollectionRun,
+)
 from src.apps.business.channel_intelligence.repositories import (
     ChannelSourceRepository,
     ChannelVideoRepository,
@@ -27,80 +29,58 @@ from src.apps.business.channel_intelligence.schemas import (
     VideoRead,
 )
 
-CSV_PATH = Path("data/tiktok-dashboard.csv")
 
-CSV_COLUMNS = [
-    "shop",
-    "account",
-    "video_title",
-    "video_url",
-    "published_at",
-    "duration_seconds",
-    "views",
-    "likes",
-    "comments",
-    "shares",
-    "saves",
-    "engagement_rate",
-]
+def to_video_read(video: ChannelVideo) -> VideoRead:
+    """
+    将数据库视频模型转换成接口视频返回模型。
 
-# 临时内存数据源配置。后续接入数据库后，这里会替换成 sources 表。
-channel_sources_db: list[ChannelSourceRead] = []
+    Args:
+        video: 数据库中的视频指标模型。
 
-# 临时内存采集记录。后续接入数据库后，这里会替换成 collection_runs 表。
-collection_runs_db: list[CollectionRunRead] = []
-
-next_source_id: int = 1
-
-next_run_id: int = 1
-
-
-def to_int(value: str) -> int:
-    if value == "":
-        return 0
-
-    return int(float(value))
+    Returns:
+        接口使用的视频返回模型。
+    """
+    return VideoRead(
+        shop=video.shop,
+        account=video.account,
+        video_title=video.video_title,
+        video_url=video.video_url,
+        thumbnail_url=video.thumbnail_url,
+        published_at=video.published_at.isoformat()
+        if video.published_at is not None
+        else "",
+        duration_seconds=video.duration_seconds,
+        views=video.views,
+        likes=video.likes,
+        comments=video.comments,
+        shares=video.shares,
+        saves=video.saves,
+        engagement_rate=video.engagement_rate,
+    )
 
 
-def to_float(value: str) -> float | None:
-    if value == "":
-        return None
+async def get_channel_summary(db: AsyncSession) -> ChannelSummaryRead:
+    """
+    从数据库聚合渠道看板总览数据。
 
-    return float(value)
+    Args:
+        db: 当前请求使用的数据库会话。
 
+    Returns:
+        渠道看板总览数据。
+    """
+    repository = ChannelVideoRepository(db)
+    videos = await repository.get_all()
 
-def load_videos() -> list[VideoRead]:
-    videos: list[VideoRead] = []
-
-    with CSV_PATH.open("r", encoding="utf-8-sig", newline="") as csvfile:
-        reader = csv.reader(csvfile)
-        next(reader)
-
-        for row in reader:
-            data = dict(zip(CSV_COLUMNS, row))
-
-            videos.append(
-                VideoRead(
-                    shop=data["shop"],
-                    account=data["account"],
-                    video_title=data["video_title"],
-                    video_url=data["video_url"],
-                    published_at=data["published_at"],
-                    duration_seconds=to_int(data["duration_seconds"]),
-                    views=to_int(data["views"]),
-                    likes=to_int(data["likes"]),
-                    comments=to_int(data["comments"]),
-                    shares=to_int(data["shares"]),
-                    saves=to_int(data["saves"]),
-                    engagement_rate=to_float(data["engagement_rate"]),
-                )
-            )
-
-    return videos
-
-
-async def get_channel_summary() -> ChannelSummaryRead:
-    videos = load_videos()
+    if not videos:
+        return ChannelSummaryRead(
+            shop_count=0,
+            account_count=0,
+            video_count=0,
+            total_views=0,
+            median_views=0,
+            average_duration_seconds=0,
+        )
 
     views = [video.views for video in videos]
     durations = [video.duration_seconds for video in videos]
@@ -115,8 +95,18 @@ async def get_channel_summary() -> ChannelSummaryRead:
     )
 
 
-async def get_shop_summaries() -> list[ShopSummaryRead]:
-    videos = load_videos()
+async def get_shop_summaries(db: AsyncSession) -> list[ShopSummaryRead]:
+    """
+    从数据库按店铺聚合视频指标。
+
+    Args:
+        db: 当前请求使用的数据库会话。
+
+    Returns:
+        店铺汇总数据列表。
+    """
+    repository = ChannelVideoRepository(db)
+    videos = await repository.get_all()
 
     shops = sorted({video.shop for video in videos})
     results: list[ShopSummaryRead] = []
@@ -136,8 +126,18 @@ async def get_shop_summaries() -> list[ShopSummaryRead]:
     return results
 
 
-async def get_account_summaries() -> list[AccountSummaryRead]:
-    videos = load_videos()
+async def get_account_summaries(db: AsyncSession) -> list[AccountSummaryRead]:
+    """
+    从数据库按账号聚合视频指标。
+
+    Args:
+        db: 当前请求使用的数据库会话。
+
+    Returns:
+        账号汇总数据列表。
+    """
+    repository = ChannelVideoRepository(db)
+    videos = await repository.get_all()
 
     accounts = sorted({video.account for video in videos})
     results: list[AccountSummaryRead] = []
@@ -168,71 +168,108 @@ async def get_account_summaries() -> list[AccountSummaryRead]:
 
 
 async def get_video_list(
-        shop: str | None = None,
-        account: str | None = None,
-        page: int = 1,
-        page_size: int = 20,
+    db: AsyncSession,
+    shop: str | None = None,
+    account: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
 ) -> VideoListRead:
-    videos = load_videos()
+    """
+    分页查询视频指标列表。
 
-    if shop is not None:
-        videos = [video for video in videos if video.shop == shop]
+    Args:
+        db: 当前请求使用的数据库会话。
+        shop: 店铺筛选条件。
+        account: 账号筛选条件。
+        page: 页码，从 1 开始。
+        page_size: 每页数量。
 
-    if account is not None:
-        videos = [video for video in videos if video.account == account]
-
-    videos = sorted(videos, key=lambda video: video.views, reverse=True)
-
-    start = (page - 1) * page_size
-    end = start + page_size
+    Returns:
+        视频列表分页结果。
+    """
+    repository = ChannelVideoRepository(db)
+    total = await repository.count(shop=shop, account=account)
+    videos = await repository.get_page(
+        shop=shop,
+        account=account,
+        page=page,
+        page_size=page_size,
+    )
 
     return VideoListRead(
-        total=len(videos),
-        items=videos[start:end],
+        total=total,
+        items=[to_video_read(video) for video in videos],
     )
 
 
-async def get_filter_options() -> FilterOptionsRead:
-    videos = load_videos()
+async def get_filter_options(db: AsyncSession) -> FilterOptionsRead:
+    """
+    从数据库查询看板筛选项。
+
+    Args:
+        db: 当前请求使用的数据库会话。
+
+    Returns:
+        看板筛选项。
+    """
+    repository = ChannelVideoRepository(db)
 
     return FilterOptionsRead(
-        shops=sorted({video.shop for video in videos}),
-        accounts=sorted({video.account for video in videos}),
+        shops=await repository.get_distinct_shops(),
+        accounts=await repository.get_distinct_accounts(),
     )
 
 
-async def get_content_signals() -> ContentSignalRead:
-    videos = load_videos()
+async def get_content_signals(db: AsyncSession) -> ContentSignalRead:
+    """
+    从数据库提取内容信号。
 
-    videos_with_engagement_rate = [
-        video for video in videos if video.engagement_rate is not None
-    ]
+    Args:
+        db: 当前请求使用的数据库会话。
 
+    Returns:
+        内容信号数据。
+    """
+    repository = ChannelVideoRepository(db)
+    videos = await repository.get_all()
     durations = [video.duration_seconds for video in videos]
+    top_view_video = await repository.get_top_view_video()
+    top_engagement_video = await repository.get_top_engagement_video()
+    latest_video = await repository.get_latest_video()
 
     return ContentSignalRead(
-        top_view_video=max(videos, key=lambda video: video.views),
-        top_engagement_video=max(
-            videos_with_engagement_rate,
-            key=lambda video: video.engagement_rate,
-        ),
-        latest_video=max(videos, key=lambda video: video.published_at),
-        average_duration_seconds=sum(durations) / len(durations),
+        top_view_video=to_video_read(top_view_video)
+        if top_view_video is not None
+        else None,
+        top_engagement_video=to_video_read(top_engagement_video)
+        if top_engagement_video is not None
+        else None,
+        latest_video=to_video_read(latest_video) if latest_video is not None else None,
+        average_duration_seconds=sum(durations) / len(durations) if durations else 0,
     )
 
 
-async def get_channel_dashboard() -> ChannelDashboardRead:
+async def get_channel_dashboard(db: AsyncSession) -> ChannelDashboardRead:
+    """
+    从数据库组装渠道看板首页数据。
+
+    Args:
+        db: 当前请求使用的数据库会话。
+
+    Returns:
+        渠道看板首页数据。
+    """
     return ChannelDashboardRead(
-        summary=await get_channel_summary(),
-        shops=await get_shop_summaries(),
-        accounts=await get_account_summaries(),
-        signals=await get_content_signals(),
+        summary=await get_channel_summary(db),
+        shops=await get_shop_summaries(db),
+        accounts=await get_account_summaries(db),
+        signals=await get_content_signals(db),
     )
 
 
 async def create_channel_source(
-        source: ChannelSourceCreate,
-        db: AsyncSession,
+    source: ChannelSourceCreate,
+    db: AsyncSession,
 ) -> ChannelSourceRead:
     """
     创建 TikTok 渠道账号数据源配置。
@@ -310,8 +347,8 @@ async def get_channel_sources(db: AsyncSession) -> list[ChannelSourceRead]:
 
 
 def to_channel_video_model(
-        video: VideoRead,
-        source_id: int,
+    video: VideoRead,
+    source_id: int,
 ) -> ChannelVideo:
     """
     将采集到的视频返回模型转换成数据库视频模型。
@@ -345,8 +382,8 @@ def to_channel_video_model(
 
 
 async def collect_channel_source(
-        source_id: int,
-        db: AsyncSession,
+    source_id: int,
+    db: AsyncSession,
 ) -> CollectionRunRead:
     """
     触发指定 TikTok 渠道账号数据源的采集任务。
@@ -379,19 +416,26 @@ async def collect_channel_source(
         )
 
         video_repository = ChannelVideoRepository(db)
+        collected_count = 0
 
         for video in videos:
+            if not video.video_url:
+                continue
+
             await video_repository.upsert(
                 to_channel_video_model(
                     video=video,
                     source_id=source.id,
                 )
             )
+            collected_count += 1
+
+        source.last_collected_at = datetime.now()
 
         return await create_collection_run(
             source_id=source.id,
             status="success",
-            collected_count=len(videos),
+            collected_count=collected_count,
             db=db,
         )
     except Exception as error:
@@ -405,11 +449,11 @@ async def collect_channel_source(
 
 
 async def create_collection_run(
-        source_id: int,
-        status: str,
-        collected_count: int,
-        db: AsyncSession,
-        error_message: str | None = None,
+    source_id: int,
+    status: str,
+    collected_count: int,
+    db: AsyncSession,
+    error_message: str | None = None,
 ) -> CollectionRunRead:
     """
     创建一次采集任务执行记录。

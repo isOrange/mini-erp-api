@@ -14,6 +14,7 @@ from src.apps.business.channel_intelligence.schemas import (
     VideoListRead,
 )
 from src.apps.business.channel_intelligence.services import (
+    collect_channel_source,
     create_channel_source,
     create_collection_run,
     get_account_summaries,
@@ -25,7 +26,6 @@ from src.apps.business.channel_intelligence.services import (
     get_filter_options,
     get_shop_summaries,
     get_video_list,
-    collect_channel_source,
 )
 from src.core.database import get_db_session
 
@@ -36,33 +36,43 @@ router = APIRouter(
 
 
 @router.get("/dashboard", response_model=ChannelDashboardRead)
-async def read_channel_dashboard():
-    return await get_channel_dashboard()
+async def read_channel_dashboard(
+    db: AsyncSession = Depends(get_db_session),
+):
+    return await get_channel_dashboard(db)
 
 
 @router.get("/summary", response_model=ChannelSummaryRead)
-async def read_channel_summary():
-    return await get_channel_summary()
+async def read_channel_summary(
+    db: AsyncSession = Depends(get_db_session),
+):
+    return await get_channel_summary(db)
 
 
 @router.get("/shops", response_model=list[ShopSummaryRead])
-async def read_shop_summaries():
-    return await get_shop_summaries()
+async def read_shop_summaries(
+    db: AsyncSession = Depends(get_db_session),
+):
+    return await get_shop_summaries(db)
 
 
 @router.get("/accounts", response_model=list[AccountSummaryRead])
-async def read_account_summaries():
-    return await get_account_summaries()
+async def read_account_summaries(
+    db: AsyncSession = Depends(get_db_session),
+):
+    return await get_account_summaries(db)
 
 
 @router.get("/videos", response_model=VideoListRead)
 async def read_video_list(
-        shop: str | None = None,
-        account: str | None = None,
-        page: int = Query(default=1, ge=1),
-        page_size: int = Query(default=20, ge=1, le=100),
+    shop: str | None = None,
+    account: str | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db_session),
 ):
     return await get_video_list(
+        db=db,
         shop=shop,
         account=account,
         page=page,
@@ -71,37 +81,41 @@ async def read_video_list(
 
 
 @router.get("/signals", response_model=ContentSignalRead)
-async def read_content_signals():
-    return await get_content_signals()
+async def read_content_signals(
+    db: AsyncSession = Depends(get_db_session),
+):
+    return await get_content_signals(db)
 
 
 @router.get("/filters", response_model=FilterOptionsRead)
-async def read_filter_options():
-    return await get_filter_options()
+async def read_filter_options(
+    db: AsyncSession = Depends(get_db_session),
+):
+    return await get_filter_options(db)
 
 
 @router.post("/sources", response_model=ChannelSourceRead)
 async def write_channel_source(
-        source: ChannelSourceCreate,
-        db: AsyncSession = Depends(get_db_session),
+    source: ChannelSourceCreate,
+    db: AsyncSession = Depends(get_db_session),
 ):
     return await create_channel_source(source, db)
 
 
 @router.get("/sources", response_model=list[ChannelSourceRead])
 async def read_channel_sources(
-        db: AsyncSession = Depends(get_db_session),
+    db: AsyncSession = Depends(get_db_session),
 ):
     return await get_channel_sources(db)
 
 
 @router.post("/collection-runs", response_model=CollectionRunRead)
 async def write_collection_run(
-        source_id: int,
-        status: str,
-        collected_count: int,
-        error_message: str | None = None,
-        db: AsyncSession = Depends(get_db_session),
+    source_id: int,
+    status: str,
+    collected_count: int,
+    error_message: str | None = None,
+    db: AsyncSession = Depends(get_db_session),
 ):
     return await create_collection_run(
         source_id=source_id,
@@ -114,14 +128,14 @@ async def write_collection_run(
 
 @router.get("/collection-runs", response_model=list[CollectionRunRead])
 async def read_collection_runs(
-        db: AsyncSession = Depends(get_db_session),
+    db: AsyncSession = Depends(get_db_session),
 ):
     return await get_collection_runs(db)
 
 
 @router.post("/sources/{source_id}/collect", response_model=CollectionRunRead)
 async def write_channel_source_collection(
-        source_id: int,
-        db: AsyncSession = Depends(get_db_session),
+    source_id: int,
+    db: AsyncSession = Depends(get_db_session),
 ):
     return await collect_channel_source(source_id, db)
